@@ -103,6 +103,22 @@
     color: var(--ink-dim);
   }
 
+  #scriptUrlInput {
+    width: 280px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    color: var(--ink);
+  }
+  #scriptUrlInput:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  #scriptUrlInput.invalid { border-color: var(--danger); }
+
   .status-dot {
     width: 7px; height: 7px; border-radius: 50%;
     background: var(--ink-faint);
@@ -152,7 +168,7 @@
   /* ---------- Filters ---------- */
   .filters {
     display:grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 12px;
     margin-bottom: 24px;
   }
@@ -171,7 +187,7 @@
     padding: 9px 10px;
   }
   .filters-actions {
-    grid-column: span 6;
+    grid-column: 1 / -1;
     display:flex; justify-content:flex-end;
     margin-top: -2px;
   }
@@ -382,10 +398,13 @@
   }
 
   @media (max-width: 1100px) {
-    .filters { grid-template-columns: repeat(3, 1fr); }
-    .filters-actions { grid-column: span 3; }
     .kpis { grid-template-columns: repeat(2, 1fr); }
     .charts-grid, .charts-grid.secondary { grid-template-columns: 1fr; }
+    #scriptUrlInput { width: 180px; }
+  }
+  @media (max-width: 700px) {
+    .sync-block { flex-wrap: wrap; }
+    #scriptUrlInput { width: 100%; order: -1; }
   }
 </style>
 </head>
@@ -414,6 +433,7 @@
     </div>
 
     <div class="sync-block">
+      <input type="text" id="scriptUrlInput" placeholder="Pega aquí el link de Apps Script (…/exec)" spellcheck="false">
       <span class="status-dot" id="statusDot"></span>
       <span id="statusText">Sin conectar</span>
       <select id="intervalSelect" title="Intervalo de auto-actualización">
@@ -439,6 +459,10 @@
     <div class="filter-field">
       <label for="fPeriodo">Periodo</label>
       <select id="fPeriodo"><option value="">Todos</option></select>
+    </div>
+    <div class="filter-field">
+      <label for="fCondicionPeriodo">Condición Periodo</label>
+      <select id="fCondicionPeriodo"><option value="">Todas</option></select>
     </div>
     <div class="filter-field">
       <label for="fCarrera">Carrera</label>
@@ -553,9 +577,10 @@
 
 <script>
 /* ============================================================
-   CONFIG
+   CONFIG — URL de Apps Script (editable por el usuario)
    ============================================================ */
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKXiDZYSz7QmRlMPw87iYQ2m1fuMGTdzlArgkU0j_fZSll0jrs3QNwTQVSSjDGtKwXRA/exec";
+const URL_STORAGE_KEY = "idat_dashboard_script_url";
+let SCRIPT_URL = localStorage.getItem(URL_STORAGE_KEY) || "";
 
 function showLibraryError() {
   document.getElementById("loadingOverlay").style.display = "none";
@@ -564,6 +589,10 @@ function showLibraryError() {
     "No se pudo cargar Chart.js desde el CDN. Revisa tu conexión a internet o si un bloqueador de anuncios/extensión está impidiendo la carga de scripts externos.";
   document.getElementById("retryBtn").textContent = "Reintentar carga";
   document.getElementById("retryBtn").onclick = () => location.reload();
+}
+
+function isValidScriptUrl(url) {
+  return /^https:\/\/script\.google(usercontent)?\.com\/macros\/s\/.+\/exec$/.test(url.trim());
 }
 
 const TABLE_COLUMNS = [
@@ -586,6 +615,21 @@ let autoTimer = null;
    FETCH
    ============================================================ */
 async function fetchData() {
+  const inputVal = document.getElementById("scriptUrlInput").value.trim();
+  if (inputVal) SCRIPT_URL = inputVal;
+
+  if (!SCRIPT_URL || !isValidScriptUrl(SCRIPT_URL)) {
+    document.getElementById("scriptUrlInput").classList.add("invalid");
+    setStatus("error");
+    document.getElementById("loadingOverlay").style.display = "none";
+    document.getElementById("errorOverlay").style.display = "flex";
+    document.getElementById("errorDetail").textContent =
+      "Pega un link válido de Apps Script (debe terminar en /exec) en el cuadro de texto de arriba y presiona Actualizar.";
+    return;
+  }
+  document.getElementById("scriptUrlInput").classList.remove("invalid");
+  localStorage.setItem(URL_STORAGE_KEY, SCRIPT_URL);
+
   setStatus("loading");
   document.getElementById("loadingOverlay").style.display = "flex";
   document.getElementById("errorOverlay").style.display = "none";
@@ -607,7 +651,7 @@ async function fetchData() {
     console.error(err);
     setStatus("error");
     document.getElementById("errorDetail").textContent =
-      "Detalle: " + err.message + ". Verifica que el Web App esté implementado con acceso 'Cualquier usuario'.";
+      "Detalle: " + err.message + ". Verifica el link pegado y que el Web App tenga acceso 'Cualquier usuario'.";
     document.getElementById("errorOverlay").style.display = "flex";
   } finally {
     document.getElementById("loadingOverlay").style.display = "none";
@@ -646,6 +690,7 @@ function populateFilterOptions() {
   const map = {
     fMarca: "Marca",
     fPeriodo: "Periodo",
+    fCondicionPeriodo: "Condición Periodo",
     fCarrera: "Carrera",
     fModalidad: "Modalidad Ciclo",
     fDocente: "Docente",
@@ -670,6 +715,7 @@ function getActiveFilters() {
   return {
     "Marca": document.getElementById("fMarca").value,
     "Periodo": document.getElementById("fPeriodo").value,
+    "Condición Periodo": document.getElementById("fCondicionPeriodo").value,
     "Carrera": document.getElementById("fCarrera").value,
     "Modalidad Ciclo": document.getElementById("fModalidad").value,
     "Docente": document.getElementById("fDocente").value,
@@ -964,11 +1010,14 @@ function setupAutoRefresh() {
    ============================================================ */
 document.getElementById("refreshBtn").addEventListener("click", fetchData);
 document.getElementById("retryBtn").addEventListener("click", fetchData);
-["fMarca","fPeriodo","fCarrera","fModalidad","fDocente","fTipoDocente"].forEach(id => {
+document.getElementById("scriptUrlInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") fetchData();
+});
+["fMarca","fPeriodo","fCondicionPeriodo","fCarrera","fModalidad","fDocente","fTipoDocente"].forEach(id => {
   document.getElementById(id).addEventListener("change", applyFilters);
 });
 document.getElementById("clearFilters").addEventListener("click", () => {
-  ["fMarca","fPeriodo","fCarrera","fModalidad","fDocente","fTipoDocente"].forEach(id => {
+  ["fMarca","fPeriodo","fCondicionPeriodo","fCarrera","fModalidad","fDocente","fTipoDocente"].forEach(id => {
     document.getElementById(id).value = "";
   });
   applyFilters();
@@ -981,8 +1030,15 @@ document.getElementById("nextPage").addEventListener("click", () => { currentPag
    INIT
    ============================================================ */
 window.__initDashboard = function() {
+  document.getElementById("scriptUrlInput").value = SCRIPT_URL;
   setupAutoRefresh();
-  fetchData();
+  if (SCRIPT_URL) {
+    fetchData();
+  } else {
+    document.getElementById("loadingOverlay").style.display = "none";
+    setStatus("error");
+    document.getElementById("statusText").textContent = "Falta el link de Apps Script";
+  }
 };
 
 if (typeof Chart !== "undefined") {
