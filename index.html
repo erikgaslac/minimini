@@ -3,723 +3,1006 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Gestión Académica</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<title>Panel Académico — IDAT</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  // Fallback: si el CDN principal falla (bloqueo de red, adblocker, etc.)
+  window.addEventListener('DOMContentLoaded', function() {
+    if (typeof Chart === 'undefined') {
+      var s = document.createElement('script');
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js";
+      s.onload = function() { if (window.__initDashboard) window.__initDashboard(); };
+      s.onerror = function() { showLibraryError(); };
+      document.head.appendChild(s);
+    }
+  });
+</script>
 <style>
   :root{
-    --bg: #0F1720;
-    --panel: #16212C;
-    --panel-2: #1C2A38;
-    --border: #263543;
-    --ink: #E7EDF3;
-    --ink-dim: #93A4B5;
-    --accent: #3FB6A8;
-    --accent-2: #E0A458;
-    --accent-3: #6C8EEF;
-    --danger: #E0645C;
-    --radius: 10px;
-    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --bg:#0F1115;
+    --panel:#171A21;
+    --panel-2:#1D212B;
+    --line:#262B36;
+    --ink:#E8EAED;
+    --ink-dim:#9BA3B0;
+    --ink-faint:#5C6472;
+    --accent:#4FD1C5;
+    --accent-2:#F2B155;
+    --accent-3:#8C7CF0;
+    --danger:#EF6461;
+    --good:#5FBF7A;
+    --radius:10px;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
-  *{box-sizing:border-box;}
-  body{
-    margin:0;
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin:0; padding:0;
     background: var(--bg);
     color: var(--ink);
-    min-height:100vh;
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
   }
-  header{
-    padding: 20px 28px;
-    border-bottom: 1px solid var(--border);
+
+  ::selection { background: var(--accent); color: #0A0C0F; }
+
+  /* ---------- Layout shell ---------- */
+  .shell {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 28px 32px 60px;
+  }
+
+  header.top {
     display:flex;
-    align-items:center;
+    align-items:flex-end;
     justify-content:space-between;
-    flex-wrap:wrap;
-    gap:14px;
-    position: sticky;
-    top:0;
-    background: rgba(15,23,32,0.92);
-    backdrop-filter: blur(6px);
-    z-index: 50;
+    gap: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 24px;
+    flex-wrap: wrap;
   }
-  .brand{
+
+  .brand {
     display:flex;
     align-items:baseline;
-    gap:10px;
+    gap: 14px;
   }
-  .brand .mark{
-    font-weight:800;
-    letter-spacing:0.5px;
-    font-size:14px;
-    color:var(--accent);
-    border:1px solid var(--accent);
-    border-radius:6px;
-    padding:2px 8px;
-  }
-  .brand h1{
-    font-size:17px;
-    margin:0;
-    font-weight:600;
-    color:var(--ink);
-  }
-  .status-line{
-    font-size:12px;
-    color: var(--ink-dim);
-  }
-  .status-line .dot{
-    display:inline-block;
-    width:7px;
-    height:7px;
-    border-radius:50%;
+  .brand .mark {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--bg);
     background: var(--accent);
-    margin-right:6px;
-    box-shadow: 0 0 0 3px rgba(63,182,168,0.15);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 700;
   }
-  .status-line.loading .dot{ background: var(--accent-2); }
-  .status-line.error .dot{ background: var(--danger); }
+  .brand h1 {
+    font-size: 22px;
+    font-weight: 650;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .brand .sub {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: 4px;
+  }
 
-  .controls{
+  .sync-block {
     display:flex;
     align-items:center;
-    gap:10px;
-    flex-wrap:wrap;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-dim);
   }
-  select, button{
-    font-family:inherit;
-    font-size:13px;
-    border-radius: 8px;
-    border:1px solid var(--border);
+
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ink-faint);
+    box-shadow: 0 0 0 0 rgba(95,191,122,0.6);
+  }
+  .status-dot.live {
+    background: var(--good);
+    animation: pulse 2.2s infinite;
+  }
+  .status-dot.error { background: var(--danger); }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(95,191,122,0.55); }
+    70% { box-shadow: 0 0 0 6px rgba(95,191,122,0); }
+    100% { box-shadow: 0 0 0 0 rgba(95,191,122,0); }
+  }
+
+  select, button {
+    font-family: var(--sans);
+    font-size: 13px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
     background: var(--panel-2);
     color: var(--ink);
-    padding:8px 12px;
-    outline:none;
+    padding: 7px 10px;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
   }
-  select:focus, button:focus{ border-color: var(--accent); }
-  .btn-primary{
+  select:hover, button:hover { border-color: #3A4150; }
+  select:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  #refreshBtn {
+    display:flex; align-items:center; gap:7px;
     background: var(--accent);
-    color:#08201C;
-    font-weight:600;
-    border:none;
-    cursor:pointer;
-    display:flex;
-    align-items:center;
-    gap:6px;
+    color: #0A0C0F;
+    font-weight: 600;
+    border: none;
   }
-  .btn-primary:hover{ filter: brightness(1.08); }
-  .btn-primary:disabled{ opacity:0.6; cursor:default; }
-  .refresh-icon{
-    display:inline-block;
-    transition: transform 0.6s ease;
-  }
-  .spinning{ animation: spin 0.8s linear infinite; }
-  @keyframes spin{ to{ transform: rotate(360deg);} }
+  #refreshBtn:hover { background: #6BDDD2; }
+  #refreshBtn:disabled { opacity: .6; cursor: default; }
+  #refreshBtn svg { width:14px; height:14px; }
+  #refreshBtn.spinning svg { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
-  .auto-toggle{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    font-size:13px;
-    color: var(--ink-dim);
-  }
-  .switch{
-    width:34px; height:20px;
-    border-radius:20px;
-    background: var(--panel-2);
-    border:1px solid var(--border);
-    position:relative;
-    cursor:pointer;
-    flex-shrink:0;
-  }
-  .switch.on{ background: rgba(63,182,168,0.25); border-color: var(--accent); }
-  .switch .knob{
-    position:absolute; top:1px; left:1px;
-    width:16px; height:16px;
-    border-radius:50%;
-    background: var(--ink-dim);
-    transition: all 0.2s ease;
-  }
-  .switch.on .knob{ left:15px; background: var(--accent); }
-
-  main{ padding: 24px 28px 60px; max-width:1500px; margin:0 auto; }
-
-  .filters{
+  /* ---------- Filters ---------- */
+  .filters {
     display:grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px,1fr));
-    gap:10px;
-    background: var(--panel);
-    border:1px solid var(--border);
-    border-radius: var(--radius);
-    padding:16px;
-    margin-bottom:22px;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
   }
-  .filter-field label{
-    display:block;
-    font-size:11px;
-    text-transform:uppercase;
-    letter-spacing:0.5px;
+  .filter-field {
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .filter-field label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .filter-field select {
+    width: 100%;
+    padding: 9px 10px;
+  }
+  .filters-actions {
+    grid-column: span 6;
+    display:flex; justify-content:flex-end;
+    margin-top: -2px;
+  }
+  #clearFilters {
+    background: transparent;
+    border: 1px solid var(--line);
     color: var(--ink-dim);
-    margin-bottom:5px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    padding: 5px 10px;
   }
-  .filter-field select{ width:100%; }
-  .filters-actions{
-    grid-column: 1 / -1;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding-top:6px;
-    border-top:1px dashed var(--border);
-    margin-top:4px;
-  }
-  .filters-actions span{ font-size:12px; color:var(--ink-dim); }
-  .link-btn{
-    background:none; border:none; color: var(--accent-3);
-    font-size:12px; cursor:pointer; padding:0;
-  }
-  .link-btn:hover{ text-decoration:underline; }
+  #clearFilters:hover { color: var(--ink); border-color: var(--accent-3); }
 
-  .kpis{
+  /* ---------- KPI row ---------- */
+  .kpis {
     display:grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px,1fr));
-    gap:14px;
-    margin-bottom:22px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
   }
-  .kpi{
+  .kpi {
     background: var(--panel);
-    border:1px solid var(--border);
+    border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding:16px 18px;
-    position:relative;
-    overflow:hidden;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
   }
-  .kpi::before{
-    content:"";
-    position:absolute; left:0; top:0; bottom:0; width:3px;
-    background: var(--accent);
+  .kpi .accent-bar {
+    position:absolute; top:0; left:0; right:0; height:2px;
   }
-  .kpi:nth-child(2)::before{ background: var(--accent-2); }
-  .kpi:nth-child(3)::before{ background: var(--accent-3); }
-  .kpi:nth-child(4)::before{ background: var(--danger); }
-  .kpi .label{ font-size:12px; color:var(--ink-dim); margin-bottom:6px; }
-  .kpi .value{ font-size:26px; font-weight:700; }
+  .kpi .label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 10px;
+  }
+  .kpi .value {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi .value .unit {
+    font-size: 14px;
+    color: var(--ink-dim);
+    font-weight: 500;
+    margin-left: 4px;
+  }
 
-  .grid-charts{
+  /* ---------- Charts grid ---------- */
+  .charts-grid {
     display:grid;
     grid-template-columns: 1.3fr 1fr;
-    gap:16px;
-    margin-bottom:16px;
+    gap: 14px;
+    margin-bottom: 14px;
   }
-  .grid-charts-2{
-    display:grid;
+  .charts-grid.secondary {
     grid-template-columns: 1fr 1fr;
-    gap:16px;
-    margin-bottom:22px;
   }
-  @media (max-width: 900px){
-    .grid-charts, .grid-charts-2{ grid-template-columns: 1fr; }
-  }
-  .card{
+  .panel {
     background: var(--panel);
-    border:1px solid var(--border);
+    border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding:16px;
+    padding: 18px 20px 14px;
+    display:flex;
+    flex-direction:column;
   }
-  .card h3{
-    margin:0 0 12px 0;
-    font-size:13px;
-    font-weight:600;
-    color: var(--ink);
-    text-transform:uppercase;
-    letter-spacing:0.4px;
+  .panel .panel-head {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom: 14px;
   }
-  .chart-wrap{ position:relative; height:280px; }
-
-  .table-card{
-    background: var(--panel);
-    border:1px solid var(--border);
-    border-radius: var(--radius);
-    padding:16px;
-  }
-  .table-head{
-    display:flex; justify-content:space-between; align-items:center;
-    margin-bottom:12px; gap:10px; flex-wrap:wrap;
-  }
-  .table-head h3{ margin:0; font-size:13px; text-transform:uppercase; letter-spacing:0.4px; }
-  #searchInput{
-    width:240px;
-  }
-  .table-scroll{
-    overflow:auto;
-    max-height: 480px;
-    border:1px solid var(--border);
-    border-radius:8px;
-  }
-  table{ width:100%; border-collapse: collapse; font-size:12.5px; }
-  thead th{
-    position:sticky; top:0;
-    background: var(--panel-2);
-    text-align:left;
-    padding:9px 10px;
-    color: var(--ink-dim);
-    font-weight:600;
-    cursor:pointer;
-    white-space:nowrap;
-    border-bottom:1px solid var(--border);
-  }
-  thead th:hover{ color: var(--ink); }
-  tbody td{
-    padding:8px 10px;
-    border-bottom:1px solid var(--border);
-    white-space:nowrap;
+  .panel h3 {
+    font-size: 13.5px;
+    font-weight: 600;
+    margin: 0;
     color: var(--ink);
   }
-  tbody tr:hover{ background: rgba(255,255,255,0.03); }
-  .table-footer{
-    display:flex; justify-content:space-between; align-items:center;
-    margin-top:10px; font-size:12px; color:var(--ink-dim);
+  .panel .panel-note {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
   }
+  .chart-wrap { position:relative; height: 280px; }
+  .chart-wrap.tall { height: 360px; }
 
-  .empty-state, .loading-state, .error-state{
-    text-align:center;
-    padding: 60px 20px;
-    color: var(--ink-dim);
+  /* ---------- Table ---------- */
+  .table-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
   }
-  .error-state{ color: var(--danger); }
-  .error-state code{
-    display:block;
+  .table-head {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom: 14px; gap: 16px; flex-wrap: wrap;
+  }
+  .table-head h3 { font-size: 13.5px; font-weight:600; margin:0; }
+  #tableSearch {
+    width: 260px;
+    padding: 8px 10px;
+  }
+  .table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    min-width: 900px;
+  }
+  thead th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
     background: var(--panel-2);
-    padding:10px;
-    border-radius:6px;
-    margin-top:10px;
-    font-size:11px;
-    text-align:left;
-    overflow:auto;
+    padding: 10px 12px;
+    position: sticky; top:0;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--line);
+  }
+  thead th:hover { color: var(--accent); }
+  thead th .sort-arrow { margin-left: 4px; opacity: .5; font-size:10px; }
+  tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
     color: var(--ink-dim);
+    white-space: nowrap;
+  }
+  tbody tr:hover td { background: var(--panel-2); color: var(--ink); }
+  tbody tr:last-child td { border-bottom: none; }
+  .pill {
+    display:inline-block;
+    padding: 2px 8px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-family: var(--mono);
+  }
+  .pill.virtual { background: rgba(79,209,197,0.12); color: var(--accent); }
+  .pill.presencial { background: rgba(242,177,85,0.12); color: var(--accent-2); }
+  .pill.semipresencial { background: rgba(140,124,240,0.12); color: var(--accent-3); }
+
+  .table-foot {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top: 12px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+  .pager { display:flex; gap:6px; }
+  .pager button {
+    padding: 5px 10px;
+    font-size: 11.5px;
+  }
+  .pager button:disabled { opacity: .35; cursor: default; }
+
+  /* ---------- States ---------- */
+  #loadingOverlay, #errorOverlay {
+    position: fixed; inset: 0;
+    background: rgba(10,12,15,0.86);
+    display:flex; align-items:center; justify-content:center;
+    flex-direction: column; gap: 14px;
+    z-index: 100;
+    backdrop-filter: blur(2px);
+  }
+  #errorOverlay { display:none; }
+  .loader-ring {
+    width: 34px; height: 34px;
+    border: 3px solid var(--line);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  #loadingOverlay p, #errorOverlay p {
+    font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim);
+  }
+  #errorOverlay .err-title {
+    color: var(--danger); font-size: 14px; font-weight:600; font-family: var(--sans);
+  }
+  #errorOverlay button {
+    margin-top: 6px;
+    background: var(--danger); color: #fff; border:none;
+    padding: 8px 16px; font-weight:600;
   }
 
-  ::-webkit-scrollbar{ width:9px; height:9px; }
-  ::-webkit-scrollbar-thumb{ background: var(--border); border-radius:6px; }
-  ::-webkit-scrollbar-track{ background: transparent; }
+  .empty-state {
+    text-align:center; padding: 40px 20px;
+    color: var(--ink-faint);
+    font-family: var(--mono); font-size: 12px;
+  }
+
+  footer.foot {
+    margin-top: 28px;
+    display:flex; justify-content:space-between;
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+
+  @media (max-width: 1100px) {
+    .filters { grid-template-columns: repeat(3, 1fr); }
+    .filters-actions { grid-column: span 3; }
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .charts-grid, .charts-grid.secondary { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
 
-<header>
-  <div class="brand">
-    <span class="mark">IDAT</span>
-    <h1>Panel de Gestión Académica</h1>
-  </div>
+<div id="loadingOverlay">
+  <div class="loader-ring"></div>
+  <p>Cargando datos desde Google Sheets…</p>
+</div>
 
-  <div class="controls">
-    <div class="status-line" id="statusLine"><span class="dot"></span><span id="statusText">Sin datos</span></div>
+<div id="errorOverlay">
+  <div class="err-title">No se pudo conectar con la fuente de datos</div>
+  <p id="errorDetail">Revisa la URL del Web App y los permisos de acceso.</p>
+  <button id="retryBtn">Reintentar</button>
+</div>
 
-    <div class="auto-toggle">
-      <span>Auto</span>
-      <div class="switch" id="autoSwitch"><div class="knob"></div></div>
+<div class="shell">
+
+  <header class="top">
+    <div class="brand">
+      <span class="mark" id="brandMark">—</span>
+      <div>
+        <h1>Panel Académico</h1>
+        <div class="sub" id="sourceLabel">HORARIOS24 · Google Sheets</div>
+      </div>
     </div>
 
-    <select id="intervalSelect">
-      <option value="15000">Cada 15 s</option>
-      <option value="30000" selected>Cada 30 s</option>
-      <option value="60000">Cada 1 min</option>
-      <option value="300000">Cada 5 min</option>
-      <option value="900000">Cada 15 min</option>
-    </select>
+    <div class="sync-block">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Sin conectar</span>
+      <select id="intervalSelect" title="Intervalo de auto-actualización">
+        <option value="0">Auto: desactivada</option>
+        <option value="30000">Cada 30 s</option>
+        <option value="60000">Cada 1 min</option>
+        <option value="300000">Cada 5 min</option>
+        <option value="900000">Cada 15 min</option>
+      </select>
+      <button id="refreshBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+        Actualizar
+      </button>
+    </div>
+  </header>
 
-    <button class="btn-primary" id="refreshBtn">
-      <span class="refresh-icon" id="refreshIcon">&#8635;</span> Actualizar
-    </button>
-  </div>
-</header>
-
-<main>
-
-  <section class="filters" id="filtersSection">
+  <!-- FILTERS -->
+  <div class="filters">
     <div class="filter-field">
-      <label>Periodo</label>
-      <select id="f_periodo"><option value="">Todos</option></select>
+      <label for="fMarca">Marca</label>
+      <select id="fMarca"><option value="">Todas</option></select>
     </div>
     <div class="filter-field">
-      <label>Carrera</label>
-      <select id="f_carrera"><option value="">Todas</option></select>
+      <label for="fPeriodo">Periodo</label>
+      <select id="fPeriodo"><option value="">Todos</option></select>
     </div>
     <div class="filter-field">
-      <label>Modalidad Curso</label>
-      <select id="f_modalidad"><option value="">Todas</option></select>
+      <label for="fCarrera">Carrera</label>
+      <select id="fCarrera"><option value="">Todas</option></select>
     </div>
     <div class="filter-field">
-      <label>Docente</label>
-      <select id="f_docente"><option value="">Todos</option></select>
+      <label for="fModalidad">Modalidad</label>
+      <select id="fModalidad"><option value="">Todas</option></select>
     </div>
     <div class="filter-field">
-      <label>Condición Periodo</label>
-      <select id="f_condicion"><option value="">Todas</option></select>
+      <label for="fDocente">Docente</label>
+      <select id="fDocente"><option value="">Todos</option></select>
     </div>
     <div class="filter-field">
-      <label>Tipo Docente</label>
-      <select id="f_tipodocente"><option value="">Todos</option></select>
+      <label for="fTipoDocente">Tipo Docente</label>
+      <select id="fTipoDocente"><option value="">Todos</option></select>
     </div>
     <div class="filters-actions">
-      <span id="filterSummary">Sin filtros aplicados</span>
-      <button class="link-btn" id="clearFilters">Limpiar filtros</button>
+      <button id="clearFilters">Limpiar filtros</button>
     </div>
-  </section>
+  </div>
 
-  <section class="kpis">
+  <!-- KPIs -->
+  <div class="kpis">
     <div class="kpi">
-      <div class="label">Total alumnos</div>
+      <div class="accent-bar" style="background:var(--accent)"></div>
+      <div class="label">Total Alumnos</div>
       <div class="value" id="kpiAlumnos">—</div>
     </div>
     <div class="kpi">
+      <div class="accent-bar" style="background:var(--accent-2)"></div>
       <div class="label">Secciones</div>
       <div class="value" id="kpiSecciones">—</div>
     </div>
     <div class="kpi">
-      <div class="label">Docentes únicos</div>
+      <div class="accent-bar" style="background:var(--accent-3)"></div>
+      <div class="label">Docentes Únicos</div>
       <div class="value" id="kpiDocentes">—</div>
     </div>
     <div class="kpi">
-      <div class="label">Promedio alumnos / sección</div>
+      <div class="accent-bar" style="background:var(--good)"></div>
+      <div class="label">Promedio Alumnos / Sección</div>
       <div class="value" id="kpiPromedio">—</div>
     </div>
-  </section>
-
-  <div id="dataArea">
-    <div class="loading-state">Cargando datos desde Google Sheets…</div>
   </div>
 
-</main>
+  <!-- Main charts -->
+  <div class="charts-grid">
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Alumnos por Carrera</h3>
+        <span class="panel-note">top 10</span>
+      </div>
+      <div class="chart-wrap tall"><canvas id="chartCarrera"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Distribución por Modalidad</h3>
+        <span class="panel-note">% secciones</span>
+      </div>
+      <div class="chart-wrap tall"><canvas id="chartModalidad"></canvas></div>
+    </div>
+  </div>
+
+  <div class="charts-grid secondary">
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Top Docentes por Alumnos</h3>
+        <span class="panel-note">top 10</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chartDocentes"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Alumnos por Periodo</h3>
+        <span class="panel-note">tendencia</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chartPeriodo"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-panel">
+    <div class="table-head">
+      <h3>Detalle de Secciones</h3>
+      <input type="text" id="tableSearch" placeholder="Buscar en la tabla…">
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr id="tableHeadRow"></tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="table-foot">
+      <span id="tableCount">0 filas</span>
+      <div class="pager">
+        <button id="prevPage">← Anterior</button>
+        <span id="pageIndicator">1 / 1</span>
+        <button id="nextPage">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span id="lastUpdated">Última actualización: —</span>
+    <span>Fuente: Google Apps Script Web App</span>
+  </footer>
+
+</div>
 
 <script>
-/* ======= CONFIGURACIÓN ======= */
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwqpq_i8KBiKCJnGgnAVspjhsUMg7WgdKB3wBPvtrGBdbx6Wz613ga-s2tAtmF4SwbckA/exec";
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKXiDZYSz7QmRlMPw87iYQ2m1fuMGTdzlArgkU0j_fZSll0jrs3QNwTQVSSjDGtKwXRA/exec";
 
-/* ======= ESTADO ======= */
+function showLibraryError() {
+  document.getElementById("loadingOverlay").style.display = "none";
+  document.getElementById("errorOverlay").style.display = "flex";
+  document.getElementById("errorDetail").textContent =
+    "No se pudo cargar Chart.js desde el CDN. Revisa tu conexión a internet o si un bloqueador de anuncios/extensión está impidiendo la carga de scripts externos.";
+  document.getElementById("retryBtn").textContent = "Reintentar carga";
+  document.getElementById("retryBtn").onclick = () => location.reload();
+}
+
+const TABLE_COLUMNS = [
+  "Periodo","Carrera","Seccion","Docente","Tipo Docente","Curso",
+  "Modalidad Ciclo","Horario","Sesiones","Alumnos","Correo"
+];
+const ROWS_PER_PAGE = 15;
+
+/* ============================================================
+   STATE
+   ============================================================ */
 let rawData = [];
 let filteredData = [];
 let charts = {};
-let autoRefresh = false;
-let intervalHandle = null;
-let sortState = { key: null, dir: 1 };
+let currentPage = 1;
+let sortState = { col: "Alumnos", dir: "desc" };
+let autoTimer = null;
 
-const els = {
-  statusLine: document.getElementById('statusLine'),
-  statusText: document.getElementById('statusText'),
-  refreshBtn: document.getElementById('refreshBtn'),
-  refreshIcon: document.getElementById('refreshIcon'),
-  autoSwitch: document.getElementById('autoSwitch'),
-  intervalSelect: document.getElementById('intervalSelect'),
-  dataArea: document.getElementById('dataArea'),
-  filterSummary: document.getElementById('filterSummary'),
-};
+/* ============================================================
+   FETCH
+   ============================================================ */
+async function fetchData() {
+  setStatus("loading");
+  document.getElementById("loadingOverlay").style.display = "flex";
+  document.getElementById("errorOverlay").style.display = "none";
+  document.getElementById("refreshBtn").classList.add("spinning");
 
-const FILTER_MAP = {
-  f_periodo: 'Periodo',
-  f_carrera: 'Carrera',
-  f_modalidad: 'Modalidad Curso',
-  f_docente: 'Docente',
-  f_condicion: 'Condición Periodo',
-  f_tipodocente: 'Tipo Docente',
-};
-
-/* ======= CARGA DE DATOS ======= */
-async function fetchData(isManual){
-  setStatus('loading', 'Actualizando…');
-  els.refreshBtn.disabled = true;
-  els.refreshIcon.classList.add('spinning');
-
-  try{
-    const res = await fetch(SCRIPT_URL, { method: 'GET' });
-    if(!res.ok) throw new Error('HTTP ' + res.status);
+  try {
+    const res = await fetch(SCRIPT_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
     const json = await res.json();
-    if(!Array.isArray(json)) throw new Error('La respuesta no es un arreglo JSON válido.');
+    if (!Array.isArray(json) || json.length === 0) throw new Error("La respuesta llegó vacía.");
 
-    rawData = json.map(r => ({
-      ...r,
-      Alumnos: Number(r['Alumnos']) || 0,
-      Sesiones: Number(r['Sesiones']) || 0,
-    }));
-
-    populateFilters(rawData);
+    rawData = json.map(normalizeRow);
+    populateFilterOptions();
     applyFilters();
-    setStatus('ok', 'Actualizado ' + new Date().toLocaleTimeString('es-PE'));
-  }catch(err){
+    setStatus("live");
+    document.getElementById("lastUpdated").textContent =
+      "Última actualización: " + new Date().toLocaleString("es-PE");
+  } catch (err) {
     console.error(err);
-    setStatus('error', 'Error al actualizar');
-    if(rawData.length === 0){
-      els.dataArea.innerHTML = `
-        <div class="error-state">
-          No se pudieron cargar los datos desde Google Apps Script.
-          <code>${escapeHtml(err.message || String(err))}</code>
-          Verifica que la Web App esté implementada con acceso "Cualquier usuario" y que la URL sea correcta.
-        </div>`;
-    }
-  }finally{
-    els.refreshBtn.disabled = false;
-    els.refreshIcon.classList.remove('spinning');
+    setStatus("error");
+    document.getElementById("errorDetail").textContent =
+      "Detalle: " + err.message + ". Verifica que el Web App esté implementado con acceso 'Cualquier usuario'.";
+    document.getElementById("errorOverlay").style.display = "flex";
+  } finally {
+    document.getElementById("loadingOverlay").style.display = "none";
+    document.getElementById("refreshBtn").classList.remove("spinning");
   }
 }
 
-function setStatus(kind, text){
-  els.statusLine.className = 'status-line' + (kind === 'loading' ? ' loading' : kind === 'error' ? ' error' : '');
-  els.statusText.textContent = text;
+function normalizeRow(row) {
+  const alumnos = parseInt(row["Alumnos"], 10);
+  const sesiones = parseInt(row["Sesiones"], 10);
+  return {
+    ...row,
+    Alumnos: isNaN(alumnos) ? 0 : alumnos,
+    Sesiones: isNaN(sesiones) ? 0 : sesiones,
+  };
 }
 
-/* ======= FILTROS ======= */
-function populateFilters(data){
-  Object.entries(FILTER_MAP).forEach(([id, field]) => {
+function setStatus(state) {
+  const dot = document.getElementById("statusDot");
+  const text = document.getElementById("statusText");
+  dot.classList.remove("live", "error");
+  if (state === "loading") { text.textContent = "Sincronizando…"; }
+  else if (state === "live") { dot.classList.add("live"); text.textContent = "Conectado"; }
+  else if (state === "error") { dot.classList.add("error"); text.textContent = "Error de conexión"; }
+}
+
+/* ============================================================
+   FILTERS
+   ============================================================ */
+function uniqueSorted(field) {
+  return [...new Set(rawData.map(r => r[field]).filter(v => v !== undefined && v !== ""))]
+    .sort((a, b) => String(a).localeCompare(String(b), "es"));
+}
+
+function populateFilterOptions() {
+  const map = {
+    fMarca: "Marca",
+    fPeriodo: "Periodo",
+    fCarrera: "Carrera",
+    fModalidad: "Modalidad Ciclo",
+    fDocente: "Docente",
+    fTipoDocente: "Tipo Docente"
+  };
+  Object.entries(map).forEach(([id, field]) => {
     const select = document.getElementById(id);
     const current = select.value;
-    const values = Array.from(new Set(data.map(r => r[field]).filter(v => v !== undefined && v !== ''))).sort();
-    select.innerHTML = `<option value="">Todos</option>` + values.map(v => `<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
-    if(values.includes(current)) select.value = current;
+    const first = select.querySelector("option");
+    select.innerHTML = "";
+    select.appendChild(first);
+    uniqueSorted(field).forEach(val => {
+      const opt = document.createElement("option");
+      opt.value = val; opt.textContent = val;
+      select.appendChild(opt);
+    });
+    if ([...select.options].some(o => o.value === current)) select.value = current;
   });
 }
 
-function getActiveFilters(){
-  const active = {};
-  Object.entries(FILTER_MAP).forEach(([id, field]) => {
-    const val = document.getElementById(id).value;
-    if(val) active[field] = val;
-  });
-  return active;
+function getActiveFilters() {
+  return {
+    "Marca": document.getElementById("fMarca").value,
+    "Periodo": document.getElementById("fPeriodo").value,
+    "Carrera": document.getElementById("fCarrera").value,
+    "Modalidad Ciclo": document.getElementById("fModalidad").value,
+    "Docente": document.getElementById("fDocente").value,
+    "Tipo Docente": document.getElementById("fTipoDocente").value,
+  };
 }
 
-function applyFilters(){
-  const active = getActiveFilters();
+function applyFilters() {
+  const f = getActiveFilters();
   filteredData = rawData.filter(row =>
-    Object.entries(active).every(([field, val]) => String(row[field]) === val)
+    Object.entries(f).every(([key, val]) => !val || row[key] === val)
   );
-
-  const count = Object.keys(active).length;
-  els.filterSummary.textContent = count === 0 ? 'Sin filtros aplicados' : `${count} filtro(s) aplicado(s) · ${filteredData.length} de ${rawData.length} filas`;
-
+  currentPage = 1;
   renderAll();
 }
 
-Object.keys(FILTER_MAP).forEach(id => {
-  document.getElementById(id).addEventListener('change', applyFilters);
-});
-document.getElementById('clearFilters').addEventListener('click', () => {
-  Object.keys(FILTER_MAP).forEach(id => document.getElementById(id).value = '');
-  applyFilters();
-});
-
-/* ======= RENDER ======= */
-function renderAll(){
-  if(filteredData.length === 0){
-    els.dataArea.innerHTML = `<div class="empty-state">No hay datos que coincidan con los filtros seleccionados.</div>`;
-    return;
-  }
-
-  ensureLayout();
-  renderKpis();
-  renderCharts();
-  renderTable();
+/* ============================================================
+   RENDER: KPIs
+   ============================================================ */
+function updateBrandMark() {
+  const marcas = [...new Set(filteredData.map(r => r["Marca"]).filter(Boolean))];
+  const el = document.getElementById("brandMark");
+  if (marcas.length === 0) el.textContent = "—";
+  else if (marcas.length === 1) el.textContent = marcas[0];
+  else el.textContent = marcas.length + " MARCAS";
 }
 
-function ensureLayout(){
-  if(document.getElementById('chartsGrid')) return;
-  els.dataArea.innerHTML = `
-    <div class="grid-charts">
-      <div class="card">
-        <h3>Alumnos por Carrera</h3>
-        <div class="chart-wrap"><canvas id="chartCarrera"></canvas></div>
-      </div>
-      <div class="card">
-        <h3>Distribución por Modalidad</h3>
-        <div class="chart-wrap"><canvas id="chartModalidad"></canvas></div>
-      </div>
-    </div>
-    <div class="grid-charts-2">
-      <div class="card">
-        <h3>Top 10 Docentes por Alumnos</h3>
-        <div class="chart-wrap"><canvas id="chartDocentes"></canvas></div>
-      </div>
-      <div class="card">
-        <h3>Alumnos por Periodo</h3>
-        <div class="chart-wrap"><canvas id="chartPeriodo"></canvas></div>
-      </div>
-    </div>
-    <div class="table-card" id="chartsGrid">
-      <div class="table-head">
-        <h3>Detalle de secciones</h3>
-        <input type="text" id="searchInput" placeholder="Buscar en la tabla…">
-      </div>
-      <div class="table-scroll">
-        <table>
-          <thead><tr id="tableHeadRow"></tr></thead>
-          <tbody id="tableBody"></tbody>
-        </table>
-      </div>
-      <div class="table-footer">
-        <span id="tableCount"></span>
-      </div>
-    </div>
-  `;
-  document.getElementById('searchInput').addEventListener('input', renderTable);
-}
-
-function renderKpis(){
+function renderKPIs() {
+  updateBrandMark();
   const totalAlumnos = filteredData.reduce((s, r) => s + r.Alumnos, 0);
-  const secciones = new Set(filteredData.map(r => r['Sección'] || r['Seccion'])).size;
-  const docentes = new Set(filteredData.map(r => r['Docente'])).size;
-  const promedio = secciones ? (totalAlumnos / secciones) : 0;
+  const totalSecciones = filteredData.length;
+  const docentesUnicos = new Set(filteredData.map(r => r["Docente"])).size;
+  const promedio = totalSecciones ? Math.round(totalAlumnos / totalSecciones) : 0;
 
-  document.getElementById('kpiAlumnos').textContent = totalAlumnos.toLocaleString('es-PE');
-  document.getElementById('kpiSecciones').textContent = secciones.toLocaleString('es-PE');
-  document.getElementById('kpiDocentes').textContent = docentes.toLocaleString('es-PE');
-  document.getElementById('kpiPromedio').textContent = promedio.toFixed(1);
+  document.getElementById("kpiAlumnos").textContent = totalAlumnos.toLocaleString("es-PE");
+  document.getElementById("kpiSecciones").textContent = totalSecciones.toLocaleString("es-PE");
+  document.getElementById("kpiDocentes").textContent = docentesUnicos.toLocaleString("es-PE");
+  document.getElementById("kpiPromedio").innerHTML = promedio.toLocaleString("es-PE") + '<span class="unit">alum.</span>';
 }
 
-function aggregate(data, keyField, valueField){
-  const map = {};
+/* ============================================================
+   RENDER: CHARTS
+   ============================================================ */
+const CHART_FONT = "'Inter', sans-serif";
+Chart.defaults.font.family = CHART_FONT;
+Chart.defaults.color = "#9BA3B0";
+Chart.defaults.borderColor = "#262B36";
+
+function groupSum(data, keyField, valueField) {
+  const map = new Map();
   data.forEach(r => {
-    const key = r[keyField] || 'Sin dato';
-    map[key] = (map[key] || 0) + (r[valueField] || 0);
+    const key = r[keyField] || "—";
+    map.set(key, (map.get(key) || 0) + (r[valueField] || 0));
   });
   return map;
 }
 
-function destroyChart(id){
-  if(charts[id]){ charts[id].destroy(); delete charts[id]; }
-}
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
 
-const palette = ['#3FB6A8','#E0A458','#6C8EEF','#E0645C','#9C7CE0','#5CC0E0','#B7D976','#E08FD0'];
-
-function renderCharts(){
-  // Carrera
-  const carreraMap = aggregate(filteredData, 'Carrera', 'Alumnos');
-  const carreraSorted = Object.entries(carreraMap).sort((a,b) => b[1]-a[1]).slice(0, 12);
-  destroyChart('carrera');
-  charts.carrera = new Chart(document.getElementById('chartCarrera'), {
-    type: 'bar',
+function renderCarreraChart() {
+  destroyChart("carrera");
+  const map = groupSum(filteredData, "Carrera", "Alumnos");
+  const sorted = [...map.entries()].sort((a,b) => b[1]-a[1]).slice(0, 10);
+  const ctx = document.getElementById("chartCarrera");
+  charts.carrera = new Chart(ctx, {
+    type: "bar",
     data: {
-      labels: carreraSorted.map(([k]) => truncate(k, 28)),
-      datasets: [{ label: 'Alumnos', data: carreraSorted.map(([,v]) => v), backgroundColor: '#3FB6A8', borderRadius: 4 }]
+      labels: sorted.map(d => shorten(d[0], 28)),
+      datasets: [{
+        data: sorted.map(d => d[1]),
+        backgroundColor: "#4FD1C5",
+        borderRadius: 4,
+        maxBarThickness: 22,
+      }]
     },
-    options: baseOptions({ indexAxis: 'y' })
-  });
-
-  // Modalidad
-  const modMap = aggregate(filteredData, 'Modalidad Curso', 'Alumnos');
-  destroyChart('modalidad');
-  charts.modalidad = new Chart(document.getElementById('chartModalidad'), {
-    type: 'doughnut',
-    data: {
-      labels: Object.keys(modMap),
-      datasets: [{ data: Object.values(modMap), backgroundColor: palette }]
-    },
-    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ color:'#93A4B5', boxWidth:10, font:{size:11} } } } }
-  });
-
-  // Docentes
-  const docMap = aggregate(filteredData, 'Docente', 'Alumnos');
-  const docSorted = Object.entries(docMap).sort((a,b) => b[1]-a[1]).slice(0, 10);
-  destroyChart('docentes');
-  charts.docentes = new Chart(document.getElementById('chartDocentes'), {
-    type: 'bar',
-    data: {
-      labels: docSorted.map(([k]) => truncate(k, 24)),
-      datasets: [{ label: 'Alumnos', data: docSorted.map(([,v]) => v), backgroundColor: '#E0A458', borderRadius: 4 }]
-    },
-    options: baseOptions({ indexAxis: 'y' })
-  });
-
-  // Periodo
-  const perMap = aggregate(filteredData, 'Periodo', 'Alumnos');
-  const perSorted = Object.entries(perMap).sort((a,b) => a[0].localeCompare(b[0]));
-  destroyChart('periodo');
-  charts.periodo = new Chart(document.getElementById('chartPeriodo'), {
-    type: 'line',
-    data: {
-      labels: perSorted.map(([k]) => k),
-      datasets: [{ label: 'Alumnos', data: perSorted.map(([,v]) => v), borderColor: '#6C8EEF', backgroundColor: 'rgba(108,142,239,0.15)', fill:true, tension:0.3 }]
-    },
-    options: baseOptions({})
-  });
-}
-
-function baseOptions(extra){
-  return Object.assign({
-    responsive:true,
-    maintainAspectRatio:false,
-    plugins:{ legend:{ display:false } },
-    scales:{
-      x:{ ticks:{ color:'#93A4B5', font:{size:11} }, grid:{ color:'#263543' } },
-      y:{ ticks:{ color:'#93A4B5', font:{size:11} }, grid:{ color:'#263543' } }
+    options: {
+      indexAxis: "y",
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display:false }, tooltip: { callbacks: { title: (items) => sorted[items[0].dataIndex][0] } } },
+      scales: {
+        x: { grid: { color: "#1D212B" }, ticks: { font:{size:11} } },
+        y: { grid: { display:false }, ticks: { font:{size:11} } }
+      }
     }
-  }, extra);
+  });
 }
 
-function truncate(str, n){
-  str = String(str);
-  return str.length > n ? str.slice(0, n-1) + '…' : str;
+function renderModalidadChart() {
+  destroyChart("modalidad");
+  const map = groupSum(filteredData, "Modalidad Ciclo", "Sesiones").size
+    ? countBy(filteredData, "Modalidad Ciclo")
+    : new Map();
+  const entries = [...map.entries()];
+  const colors = { "VIRTUAL": "#4FD1C5", "PRESENCIAL": "#F2B155", "SEMIPRESENCIAL": "#8C7CF0" };
+  const ctx = document.getElementById("chartModalidad");
+  charts.modalidad = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: entries.map(d => d[0]),
+      datasets: [{
+        data: entries.map(d => d[1]),
+        backgroundColor: entries.map(d => colors[d[0]] || "#5C6472"),
+        borderColor: "#171A21",
+        borderWidth: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: "68%",
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 10, boxHeight:10, padding: 16, font:{size:11.5} } }
+      }
+    }
+  });
 }
 
-/* ======= TABLA ======= */
-const TABLE_COLUMNS = ['Periodo','Carrera','Seccion','Docente','Modalidad Curso','Curso','Horario','Sesiones','Alumnos'];
+function countBy(data, field) {
+  const map = new Map();
+  data.forEach(r => {
+    const key = r[field] || "—";
+    map.set(key, (map.get(key) || 0) + 1);
+  });
+  return map;
+}
 
-function renderTable(){
-  if(!document.getElementById('tableHeadRow')) return;
-  const search = document.getElementById('searchInput').value.toLowerCase();
+function renderDocentesChart() {
+  destroyChart("docentes");
+  const map = groupSum(filteredData, "Docente", "Alumnos");
+  const sorted = [...map.entries()].sort((a,b) => b[1]-a[1]).slice(0, 10);
+  const ctx = document.getElementById("chartDocentes");
+  charts.docentes = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: sorted.map(d => shorten(d[0], 22)),
+      datasets: [{
+        data: sorted.map(d => d[1]),
+        backgroundColor: "#F2B155",
+        borderRadius: 4,
+        maxBarThickness: 18,
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display:false }, tooltip: { callbacks: { title: (items) => sorted[items[0].dataIndex][0] } } },
+      scales: {
+        x: { grid: { color: "#1D212B" }, ticks: { font:{size:10.5} } },
+        y: { grid: { display:false }, ticks: { font:{size:10.5} } }
+      }
+    }
+  });
+}
 
-  let rows = filteredData.filter(r =>
-    !search || TABLE_COLUMNS.some(c => String(r[c] ?? '').toLowerCase().includes(search))
-  );
+function renderPeriodoChart() {
+  destroyChart("periodo");
+  const map = groupSum(filteredData, "Periodo", "Alumnos");
+  const sorted = [...map.entries()].sort((a,b) => String(a[0]).localeCompare(String(b[0])));
+  const ctx = document.getElementById("chartPeriodo");
+  charts.periodo = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: sorted.map(d => d[0]),
+      datasets: [{
+        data: sorted.map(d => d[1]),
+        borderColor: "#8C7CF0",
+        backgroundColor: "rgba(140,124,240,0.12)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: "#8C7CF0",
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display:false } },
+      scales: {
+        x: { grid: { display:false }, ticks: { font:{size:11} } },
+        y: { grid: { color: "#1D212B" }, ticks: { font:{size:11} } }
+      }
+    }
+  });
+}
 
-  if(sortState.key){
-    rows = [...rows].sort((a,b) => {
-      let va = a[sortState.key], vb = b[sortState.key];
-      if(typeof va === 'number' && typeof vb === 'number') return (va-vb) * sortState.dir;
-      return String(va ?? '').localeCompare(String(vb ?? '')) * sortState.dir;
-    });
-  }
+function shorten(str, max) {
+  if (!str) return "—";
+  return str.length > max ? str.slice(0, max - 1) + "…" : str;
+}
 
-  document.getElementById('tableHeadRow').innerHTML = TABLE_COLUMNS.map(c =>
-    `<th data-key="${c}">${c}${sortState.key===c ? (sortState.dir===1 ? ' ▲' : ' ▼') : ''}</th>`
-  ).join('');
-
-  document.querySelectorAll('#tableHeadRow th').forEach(th => {
-    th.addEventListener('click', () => {
-      const key = th.dataset.key;
-      sortState.dir = (sortState.key === key) ? -sortState.dir : 1;
-      sortState.key = key;
+/* ============================================================
+   RENDER: TABLE
+   ============================================================ */
+function renderTableHead() {
+  const row = document.getElementById("tableHeadRow");
+  row.innerHTML = "";
+  TABLE_COLUMNS.forEach(col => {
+    const th = document.createElement("th");
+    th.textContent = col;
+    const arrow = document.createElement("span");
+    arrow.className = "sort-arrow";
+    arrow.textContent = sortState.col === col ? (sortState.dir === "asc" ? "▲" : "▼") : "";
+    th.appendChild(arrow);
+    th.addEventListener("click", () => {
+      sortState.dir = sortState.col === col && sortState.dir === "desc" ? "asc" : "desc";
+      sortState.col = col;
       renderTable();
     });
+    row.appendChild(th);
+  });
+}
+
+function renderTable() {
+  const searchTerm = document.getElementById("tableSearch").value.trim().toLowerCase();
+  let rows = filteredData;
+
+  if (searchTerm) {
+    rows = rows.filter(r =>
+      TABLE_COLUMNS.some(c => String(r[c] ?? "").toLowerCase().includes(searchTerm))
+    );
+  }
+
+  rows = [...rows].sort((a, b) => {
+    let va = a[sortState.col], vb = b[sortState.col];
+    if (typeof va === "number" && typeof vb === "number") {
+      return sortState.dir === "asc" ? va - vb : vb - va;
+    }
+    va = String(va ?? ""); vb = String(vb ?? "");
+    return sortState.dir === "asc" ? va.localeCompare(vb, "es") : vb.localeCompare(va, "es");
   });
 
-  const bodyRows = rows.slice(0, 500).map(r =>
-    `<tr>${TABLE_COLUMNS.map(c => `<td>${escapeHtml(r[c] ?? '')}</td>`).join('')}</tr>`
-  ).join('');
+  const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+  currentPage = Math.min(currentPage, totalPages);
+  const start = (currentPage - 1) * ROWS_PER_PAGE;
+  const pageRows = rows.slice(start, start + ROWS_PER_PAGE);
 
-  document.getElementById('tableBody').innerHTML = bodyRows || `<tr><td colspan="${TABLE_COLUMNS.length}" style="text-align:center; color:var(--ink-dim); padding:20px;">Sin resultados</td></tr>`;
-  document.getElementById('tableCount').textContent = `Mostrando ${Math.min(rows.length,500)} de ${rows.length} fila(s)${rows.length>500 ? ' (límite de vista: 500)' : ''}`;
-}
+  const body = document.getElementById("tableBody");
+  body.innerHTML = "";
 
-/* ======= AUTO ACTUALIZACIÓN ======= */
-els.autoSwitch.addEventListener('click', () => {
-  autoRefresh = !autoRefresh;
-  els.autoSwitch.classList.toggle('on', autoRefresh);
-  restartInterval();
-});
-els.intervalSelect.addEventListener('change', restartInterval);
-els.refreshBtn.addEventListener('click', () => fetchData(true));
-
-function restartInterval(){
-  if(intervalHandle) clearInterval(intervalHandle);
-  if(autoRefresh){
-    const ms = Number(els.intervalSelect.value);
-    intervalHandle = setInterval(() => fetchData(false), ms);
+  if (pageRows.length === 0) {
+    body.innerHTML = `<tr><td colspan="${TABLE_COLUMNS.length}"><div class="empty-state">No hay filas que coincidan con los filtros / búsqueda actuales.</div></td></tr>`;
+  } else {
+    pageRows.forEach(r => {
+      const tr = document.createElement("tr");
+      TABLE_COLUMNS.forEach(col => {
+        const td = document.createElement("td");
+        if (col === "Modalidad Ciclo") {
+          const val = r[col] || "—";
+          const cls = val.toLowerCase();
+          td.innerHTML = `<span class="pill ${cls}">${val}</span>`;
+        } else {
+          td.textContent = r[col] ?? "—";
+        }
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
   }
+
+  document.getElementById("tableCount").textContent = rows.length.toLocaleString("es-PE") + " filas";
+  document.getElementById("pageIndicator").textContent = `${currentPage} / ${totalPages}`;
+  document.getElementById("prevPage").disabled = currentPage <= 1;
+  document.getElementById("nextPage").disabled = currentPage >= totalPages;
+
+  renderTableHead();
 }
 
-/* ======= UTIL ======= */
-function escapeHtml(str){
-  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+/* ============================================================
+   RENDER ALL
+   ============================================================ */
+function renderAll() {
+  renderKPIs();
+  renderCarreraChart();
+  renderModalidadChart();
+  renderDocentesChart();
+  renderPeriodoChart();
+  renderTable();
 }
-function escapeAttr(str){ return escapeHtml(str); }
 
-/* ======= INICIO ======= */
-fetchData(true);
+/* ============================================================
+   AUTO-REFRESH
+   ============================================================ */
+function setupAutoRefresh() {
+  const select = document.getElementById("intervalSelect");
+  select.addEventListener("change", () => {
+    if (autoTimer) clearInterval(autoTimer);
+    const ms = parseInt(select.value, 10);
+    if (ms > 0) autoTimer = setInterval(fetchData, ms);
+  });
+}
+
+/* ============================================================
+   EVENTS
+   ============================================================ */
+document.getElementById("refreshBtn").addEventListener("click", fetchData);
+document.getElementById("retryBtn").addEventListener("click", fetchData);
+["fMarca","fPeriodo","fCarrera","fModalidad","fDocente","fTipoDocente"].forEach(id => {
+  document.getElementById(id).addEventListener("change", applyFilters);
+});
+document.getElementById("clearFilters").addEventListener("click", () => {
+  ["fMarca","fPeriodo","fCarrera","fModalidad","fDocente","fTipoDocente"].forEach(id => {
+    document.getElementById(id).value = "";
+  });
+  applyFilters();
+});
+document.getElementById("tableSearch").addEventListener("input", () => { currentPage = 1; renderTable(); });
+document.getElementById("prevPage").addEventListener("click", () => { currentPage--; renderTable(); });
+document.getElementById("nextPage").addEventListener("click", () => { currentPage++; renderTable(); });
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.__initDashboard = function() {
+  setupAutoRefresh();
+  fetchData();
+};
+
+if (typeof Chart !== "undefined") {
+  window.__initDashboard();
+} else {
+  // Espera breve por si el script principal aún está cargando; si no,
+  // el fallback del <head> se encargará de reintentar con otro CDN.
+  let attempts = 0;
+  const waitForChart = setInterval(() => {
+    attempts++;
+    if (typeof Chart !== "undefined") {
+      clearInterval(waitForChart);
+      window.__initDashboard();
+    } else if (attempts > 40) { // ~8s
+      clearInterval(waitForChart);
+      showLibraryError();
+    }
+  }, 200);
+}
 </script>
+
 </body>
 </html>
